@@ -1,0 +1,36 @@
+# Agentic SOC on top of the networking lab: this file pulls in ../network-lab
+# (Floci, WAF enforcer, ALB backends) and adds the SOC runner and optional Ollama.
+#
+#   docker compose up -d --build
+#   docker compose run --rm terraform init && docker compose run --rm terraform apply -auto-approve
+#   docker compose run --rm soc soc.eval
+#
+# Run this OR ../network-lab, not both: they share the 172.30.0.0/16 lab network.
+name: soc-lab
+
+include:
+  - ../network-lab/docker-compose.yml
+
+services:
+  soc:
+    profiles: ["run"]
+    build: .
+    environment:
+      SOC_ENDPOINT_URL: http://floci:4566
+      SOC_WAF_URL: http://waf-enforcer:8080
+    volumes:
+      - ./reports:/app/reports
+    depends_on: [floci, waf-enforcer]
+    networks: [lab]
+
+  ollama:
+    profiles: ["ollama"]
+    image: ollama/ollama:0.12.6
+    ports:
+      - "127.0.0.1:11434:11434"
+    volumes:
+      - ollama:/root/.ollama
+    networks: [lab]
+
+volumes:
+  ollama:

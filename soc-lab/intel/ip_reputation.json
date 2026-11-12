@@ -1,0 +1,5 @@
+{
+  "192.0.2.77": {"known": true, "category": "credential-stuffing", "note": "Seen in a password-spraying botnet (lab fixture)."},
+  "192.0.2.10": {"known": true, "category": "residential", "note": "Residential ISP customer, no abuse reports (lab fixture)."},
+  "198.51.100.7": {"known": true, "category": "corporate", "note": "Our office egress IP (lab fixture)."}
+}

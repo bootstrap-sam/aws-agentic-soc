@@ -1,0 +1,31 @@
+# Never commit secrets or machine-specific state
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+.aws/
+credentials
+
+# Terraform state / caches
+.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl
+crash.log
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Generated output
+.state/
+results/
+reports/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/

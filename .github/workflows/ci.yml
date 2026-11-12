@@ -1,0 +1,45 @@
+name: ci
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with: { fetch-depth: 0 }
+      - name: gitleaks (history + tree)
+        run: |
+          docker run --rm -v "$PWD:/repo" -w /repo ghcr.io/gitleaks/gitleaks:v8.28.0 git /repo --redact --no-banner
+          docker run --rm -v "$PWD:/repo" -w /repo ghcr.io/gitleaks/gitleaks:v8.28.0 dir /repo --redact --no-banner
+
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v6
+      - name: soc-lab unit tests (no Docker, no model)
+        working-directory: soc-lab
+        run: uv run --group dev pytest -q
+      - name: bedrock-lab compiles
+        working-directory: bedrock-lab
+        run: uv run python -m py_compile lab/*.py tests/*.py
+
+  config:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: compose files are valid
+        run: |
+          docker compose -f network-lab/docker-compose.yml config -q
+          docker compose -f bedrock-lab/docker-compose.yml config -q
+          (cd soc-lab && docker compose config -q)
+      - name: terraform fmt + validate
+        run: |
+          docker run --rm -v "$PWD/network-lab/terraform:/w" -w /w hashicorp/terraform:1.13.4 fmt -check -recursive
+          docker run --rm -v "$PWD/network-lab/terraform:/w" -w /w hashicorp/terraform:1.13.4 init -backend=false -input=false
+          docker run --rm -v "$PWD/network-lab/terraform:/w" -w /w hashicorp/terraform:1.13.4 validate

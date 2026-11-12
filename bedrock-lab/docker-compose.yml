@@ -1,0 +1,55 @@
+# Bedrock agent lab: run Floci and the official AWS Emulator side by side.
+#
+#   floci        :4567  (HTTP)   Converse/ConverseStream proxied to a real local LLM (Ollama)
+#   aws-emulator :9297  (HTTPS)  official AWS Emulator, built locally from its RPM
+#
+# Host port 4567 (not 4566) so this can run alongside the networking lab in ../
+#
+# The LLM: run Ollama natively on the Mac (Metal GPU) — `brew install ollama && ollama serve`.
+# Linux/Windows/CI: `OLLAMA_URL=http://ollama:11434/v1 docker compose --profile ollama up -d`
+# runs it in a container instead (CPU unless you add a GPU reservation).
+name: bedrock-lab
+
+services:
+  floci:
+    image: floci/floci:2.4.0
+    ports:
+      - "127.0.0.1:4567:4566"
+    environment:
+      FLOCI_SERVICES_BEDROCK_RUNTIME_BACKEND: proxy
+      FLOCI_SERVICES_BEDROCK_RUNTIME_PROXY_URL: ${OLLAMA_URL:-http://host.docker.internal:11434/v1}
+      FLOCI_SERVICES_BEDROCK_RUNTIME_PROXY_DEFAULT_MODEL: ${LOCAL_MODEL:-qwen2.5:7b}
+      # Lambda runs in real containers (for agent tools / action-group style handlers)
+      FLOCI_SERVICES_LAMBDA_DOCKER_NETWORK: bedrock-lab_default
+      FLOCI_SERVICES_BEDROCK_RUNTIME_PROXY_MODEL_MAPPING: ${BEDROCK_MODEL_MAPPING:-}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  aws-emulator:
+    build: ./aws-emulator          # picks the x86_64 / aarch64 RPM automatically
+    command: ["-p", "9297", "--telemetry", "off"]
+    mem_limit: 2g
+    memswap_limit: 2g
+    # Run as you, so the generated keys/CA (mode 0600) are readable on Linux hosts.
+    # `export LAB_UID=$(id -u) LAB_GID=$(id -g)` first on Linux; Mac/Windows don't care.
+    user: "${LAB_UID:-1000}:${LAB_GID:-1000}"
+    ports:
+      - "127.0.0.1:9297:9297"
+    environment:
+      HOME: /home/emulator
+    volumes:
+      # Per-start keys + CA land in ./.state/aws-emulator/9297/ (gitignored, regenerated each start).
+      - ./.state/aws-emulator:/home/emulator/.aws/emulator
+
+  ollama:
+    profiles: ["ollama"]
+    image: ollama/ollama:0.12.6
+    ports:
+      - "127.0.0.1:11434:11434"
+    volumes:
+      - ollama:/root/.ollama
+
+volumes:
+  ollama:
